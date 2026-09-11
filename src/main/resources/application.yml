@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: ride-finder
+
+ride-hailing:
+  pricing:
+    minimum-fare: 50
+    surge-cap: 2.0
+    tiers:
+      - up-to-km: 2
+        rate: 10
+      - up-to-km: 5
+        rate: 8
+      - rate: 5

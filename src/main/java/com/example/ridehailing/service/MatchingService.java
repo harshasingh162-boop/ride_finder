@@ -3,6 +3,8 @@ package com.example.ridehailing.service;
 import com.example.ridehailing.discount.DiscountStrategy;
 import com.example.ridehailing.domain.CarType;
 import com.example.ridehailing.domain.Location;
+import com.example.ridehailing.matching.CandidateFinder;
+import com.example.ridehailing.matching.MatchResult;
 import com.example.ridehailing.pricing.FareBreakdown;
 import com.example.ridehailing.pricing.FareCalculator;
 import org.springframework.stereotype.Service;
@@ -15,10 +17,17 @@ public class MatchingService {
 
     private final FareCalculator fareCalculator;
     private final CouponService couponService;
+    private final CandidateFinder candidateFinder;
 
-    public MatchingService(FareCalculator fareCalculator, CouponService couponService) {
+    public MatchingService(FareCalculator fareCalculator, CouponService couponService,
+                           CandidateFinder candidateFinder) {
         this.fareCalculator = fareCalculator;
         this.couponService = couponService;
+        this.candidateFinder = candidateFinder;
+    }
+
+    public MatchResult findNearbyDrivers(Location pickup, CarType carType) {
+        return candidateFinder.find(pickup, carType);
     }
 
     public FareBreakdown estimate(Location pickup, Location drop, CarType carType, String couponCode) {

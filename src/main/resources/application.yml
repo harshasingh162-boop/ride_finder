@@ -12,3 +12,7 @@ ride-hailing:
       - up-to-km: 5
         rate: 8
       - rate: 5
+  matching:
+    radius-km: 2.0
+    location-staleness: 60s
+    strategy: nearest

@@ -6,6 +6,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public class Driver {
 
+    public static final double DEFAULT_RATING = 5.0;
+
     private final String id;
     private final String name;
     private final String phone;
@@ -17,12 +19,16 @@ public class Driver {
     private volatile Instant lastLocationAt;
 
     public Driver(String id, String name, String phone, Car car) {
+        this(id, name, phone, car, DEFAULT_RATING);
+    }
+
+    public Driver(String id, String name, String phone, Car car, double rating) {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.name = Objects.requireNonNull(name, "name must not be null");
         this.phone = Objects.requireNonNull(phone, "phone must not be null");
         this.car = Objects.requireNonNull(car, "car must not be null");
         this.status = new AtomicReference<>(DriverStatus.OFFLINE);
-        this.rating = 5.0;
+        this.rating = rating;
     }
 
     public boolean transition(DriverStatus from, DriverStatus to) {

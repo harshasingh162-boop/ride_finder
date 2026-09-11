@@ -39,10 +39,11 @@ public class CouponService {
         if (!validUntil.isAfter(clock.instant())) {
             throw new IllegalArgumentException("validUntil must be in the future, was " + validUntil);
         }
-        couponRepository.findById(code).ifPresent(existing -> {
-            throw new DuplicateException("coupon already exists: " + existing.code());
-        });
-        return couponRepository.save(new Coupon(code, type, percent, maxDiscount, validUntil, true));
+        Coupon coupon = new Coupon(code, type, percent, maxDiscount, validUntil, true);
+        if (!couponRepository.saveIfAbsent(coupon)) {
+            throw new DuplicateException("coupon already exists: " + coupon.code());
+        }
+        return coupon;
     }
 
     public void delete(String code) {

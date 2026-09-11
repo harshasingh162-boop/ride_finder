@@ -19,6 +19,11 @@ public class InMemoryCouponRepository implements CouponRepository {
     }
 
     @Override
+    public boolean saveIfAbsent(Coupon coupon) {
+        return store.putIfAbsent(coupon.code(), coupon) == null;
+    }
+
+    @Override
     public Optional<Coupon> findById(String code) {
         return Optional.ofNullable(store.get(Coupon.normalizeCode(code)));
     }

@@ -68,7 +68,7 @@ public class RideMatchingService {
         return ride;
     }
 
-    public Ride acceptFare(String userId, String rideId) {
+    public synchronized Ride acceptFare(String userId, String rideId) {
         Ride ride = requireRide(rideId);
         requireRider(ride, userId);
         if (!ride.transition(RideStatus.QUOTED, RideStatus.SEARCHING)) {
@@ -78,7 +78,7 @@ public class RideMatchingService {
         return ride;
     }
 
-    public Ride cancelSearch(String userId, String rideId) {
+    public synchronized Ride cancelSearch(String userId, String rideId) {
         Ride ride = requireRide(rideId);
         requireRider(ride, userId);
         if (!ride.transition(RideStatus.SEARCHING, RideStatus.CANCELLED_BY_USER)) {
@@ -104,7 +104,7 @@ public class RideMatchingService {
      * single point where a concurrent actor could otherwise double-book, and a failure at any
      * step unwinds the earlier ones before reporting a conflict.
      */
-    public Ride acceptOffer(String driverId, String offerId) {
+    public synchronized Ride acceptOffer(String driverId, String offerId) {
         RideOffer offer = requireOffer(offerId);
         requireAddressee(offer, driverId);
         Driver driver = requireDriver(driverId);
@@ -122,24 +122,24 @@ public class RideMatchingService {
         }
         // 2. Claim the driver. Loses if they took another ride or went offline a moment ago.
         if (!driver.transition(DriverStatus.AVAILABLE, DriverStatus.ON_TRIP)) {
-            offer.transition(OfferStatus.ACCEPTED, OfferStatus.PENDING);
+            offer.transition(OfferStatus.ACCEPTED, OfferStatus.WITHDRAWN);
+            redispatchIfNobodyIsConsidering(ride);
             throw new InvalidStateException("driver is not available, they are " + driver.status());
         }
-        // 3. Claim the ride. Loses to another driver who was assigned first, or to a cancellation
-        //    that landed between step 1 and here.
-        if (!ride.transition(RideStatus.SEARCHING, RideStatus.DRIVER_ASSIGNED)) {
+        // 3. Claim and publish the ride assignment together. Loses to another driver who was
+        //    assigned first, or to a cancellation that landed before this step.
+        if (!ride.assignIfSearching(driver, now)) {
             driver.transition(DriverStatus.ON_TRIP, DriverStatus.AVAILABLE);
             // Settled rather than restored: this ride can never be accepted again.
             offer.transition(OfferStatus.ACCEPTED, OfferStatus.WITHDRAWN);
             throw new InvalidStateException("ride is no longer searching, it is " + ride.status());
         }
 
-        ride.assignTo(driver, now);
         settleLosingOffers(ride, offer);
         return ride;
     }
 
-    public void rejectOffer(String driverId, String offerId) {
+    public synchronized void rejectOffer(String driverId, String offerId) {
         RideOffer offer = requireOffer(offerId);
         requireAddressee(offer, driverId);
         if (!offer.transition(OfferStatus.PENDING, OfferStatus.REJECTED)) {

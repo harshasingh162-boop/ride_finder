@@ -35,16 +35,25 @@ public class Ride {
         this.status = new AtomicReference<>(RideStatus.QUOTED);
     }
 
-    public boolean transition(RideStatus from, RideStatus to) {
+    public synchronized boolean transition(RideStatus from, RideStatus to) {
         return status.compareAndSet(from, to);
     }
 
     /** Records who took the ride. Only ever called by the thread that won the status CAS. */
-    public void assignTo(Driver driver, Instant at) {
+    public synchronized void assignTo(Driver driver, Instant at) {
         this.driverId = driver.id();
         this.assignedCarType = driver.car().type();
         this.upgraded = driver.car().type() != requestedCarType;
         this.assignedAt = at;
+    }
+
+    /** Claims and publishes the assignment as one atomic ride state change. */
+    public synchronized boolean assignIfSearching(Driver driver, Instant at) {
+        if (!status.compareAndSet(RideStatus.SEARCHING, RideStatus.DRIVER_ASSIGNED)) {
+            return false;
+        }
+        assignTo(driver, at);
+        return true;
     }
 
     public String id() {

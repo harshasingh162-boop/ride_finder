@@ -18,6 +18,22 @@ public class InMemoryRideRepository implements RideRepository {
         return ride;
     }
 
+    /**
+     * Synchronised rather than CAS-based on purpose. "this rider has no other active ride" is an
+     * invariant across many Ride objects, and compare-and-set can only guard one reference at a
+     * time. Contention is limited to ride creation, so a single short lock is the honest tool.
+     */
+    @Override
+    public synchronized boolean saveIfUserHasNoActiveRide(Ride ride) {
+        boolean alreadyRiding = store.values().stream()
+                .anyMatch(existing -> existing.userId().equals(ride.userId()) && existing.status().isActive());
+        if (alreadyRiding) {
+            return false;
+        }
+        store.put(ride.id(), ride);
+        return true;
+    }
+
     @Override
     public Optional<Ride> findById(String id) {
         return Optional.ofNullable(store.get(id));

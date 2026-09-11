@@ -1,5 +1,7 @@
 package com.example.ridehailing.domain;
 
+import com.example.ridehailing.pricing.FareBreakdown;
+
 import java.time.Instant;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
@@ -11,26 +13,38 @@ public class Ride {
     private final Location pickup;
     private final Location drop;
     private final CarType requestedCarType;
+    /** Locked at request time, so surge and coupon cannot move under the rider afterwards. */
+    private final FareBreakdown quotedFare;
     private final Instant requestedAt;
     private final AtomicReference<RideStatus> status;
 
     private volatile CarType assignedCarType;
     private volatile String driverId;
     private volatile boolean upgraded;
-    private volatile String couponCode;
+    private volatile Instant assignedAt;
 
-    public Ride(String id, String userId, Location pickup, Location drop, CarType requestedCarType, Instant requestedAt) {
+    public Ride(String id, String userId, Location pickup, Location drop, CarType requestedCarType,
+                FareBreakdown quotedFare, Instant requestedAt) {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.userId = Objects.requireNonNull(userId, "userId must not be null");
         this.pickup = Objects.requireNonNull(pickup, "pickup must not be null");
         this.drop = Objects.requireNonNull(drop, "drop must not be null");
         this.requestedCarType = Objects.requireNonNull(requestedCarType, "requestedCarType must not be null");
+        this.quotedFare = Objects.requireNonNull(quotedFare, "quotedFare must not be null");
         this.requestedAt = Objects.requireNonNull(requestedAt, "requestedAt must not be null");
         this.status = new AtomicReference<>(RideStatus.QUOTED);
     }
 
     public boolean transition(RideStatus from, RideStatus to) {
         return status.compareAndSet(from, to);
+    }
+
+    /** Records who took the ride. Only ever called by the thread that won the status CAS. */
+    public void assignTo(Driver driver, Instant at) {
+        this.driverId = driver.id();
+        this.assignedCarType = driver.car().type();
+        this.upgraded = driver.car().type() != requestedCarType;
+        this.assignedAt = at;
     }
 
     public String id() {
@@ -53,6 +67,10 @@ public class Ride {
         return requestedCarType;
     }
 
+    public FareBreakdown quotedFare() {
+        return quotedFare;
+    }
+
     public Instant requestedAt() {
         return requestedAt;
     }
@@ -65,31 +83,15 @@ public class Ride {
         return assignedCarType;
     }
 
-    public void setAssignedCarType(CarType assignedCarType) {
-        this.assignedCarType = assignedCarType;
-    }
-
     public String driverId() {
         return driverId;
-    }
-
-    public void setDriverId(String driverId) {
-        this.driverId = driverId;
     }
 
     public boolean upgraded() {
         return upgraded;
     }
 
-    public void setUpgraded(boolean upgraded) {
-        this.upgraded = upgraded;
-    }
-
-    public String couponCode() {
-        return couponCode;
-    }
-
-    public void setCouponCode(String couponCode) {
-        this.couponCode = couponCode;
+    public Instant assignedAt() {
+        return assignedAt;
     }
 }

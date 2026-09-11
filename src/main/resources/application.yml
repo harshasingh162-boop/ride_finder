@@ -16,3 +16,5 @@ ride-hailing:
     radius-km: 2.0
     location-staleness: 60s
     strategy: nearest
+    offer-batch-size: 3
+    offer-ttl: 30s

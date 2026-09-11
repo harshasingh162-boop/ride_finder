@@ -5,7 +5,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import java.time.Duration;
 
 @ConfigurationProperties(prefix = "ride-hailing.matching")
-public record MatchingProperties(double radiusKm, Duration locationStaleness, StrategyName strategy) {
+public record MatchingProperties(double radiusKm, Duration locationStaleness, StrategyName strategy,
+                                 int offerBatchSize, Duration offerTtl) {
 
     /**
      * Typed as an enum rather than a String so Spring rejects an unknown value while

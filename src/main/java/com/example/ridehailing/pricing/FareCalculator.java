@@ -1,11 +1,13 @@
 package com.example.ridehailing.pricing;
 
+import com.example.ridehailing.discount.DiscountStrategy;
 import com.example.ridehailing.domain.CarType;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 public class FareCalculator {
 
@@ -24,7 +26,7 @@ public class FareCalculator {
         this.surgeCap = Objects.requireNonNull(surgeCap, "surgeCap must not be null");
     }
 
-    public FareBreakdown quote(BigDecimal distanceKm, CarType carType) {
+    public FareBreakdown quote(BigDecimal distanceKm, CarType carType, Optional<DiscountStrategy> discountStrategy) {
         if (distanceKm == null || distanceKm.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("distanceKm must be positive, was " + distanceKm);
         }
@@ -46,8 +48,11 @@ public class FareCalculator {
         }
         surgeMultiplier = surgeMultiplier.min(surgeCap);
 
-        BigDecimal discount = BigDecimal.ZERO;
-        BigDecimal total = subtotal.multiply(surgeMultiplier).subtract(discount)
+        BigDecimal surged = subtotal.multiply(surgeMultiplier);
+        BigDecimal discount = discountStrategy
+                .map(strategy -> strategy.discountFor(surged))
+                .orElse(BigDecimal.ZERO);
+        BigDecimal total = surged.subtract(discount).max(BigDecimal.ZERO)
                 .setScale(2, RoundingMode.HALF_UP);
 
         return new FareBreakdown(distanceKm, carType, baseFare, carMultiplier, subtotal,

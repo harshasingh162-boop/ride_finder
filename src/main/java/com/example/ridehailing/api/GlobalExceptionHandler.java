@@ -55,6 +55,16 @@ public class GlobalExceptionHandler {
         return errorResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
+    /**
+     * The domain layer rejects caller-supplied input with IllegalArgumentException
+     * (out-of-range coordinates, non-positive distance, bad coupon values), which is a
+     * client error rather than a server fault.
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
+        return errorResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
     private ResponseEntity<ErrorResponse> errorResponse(HttpStatus status, String message) {
         return ResponseEntity.status(status).body(new ErrorResponse(status.getReasonPhrase(), message));
     }

@@ -18,3 +18,5 @@ ride-hailing:
     strategy: nearest
     offer-batch-size: 3
     offer-ttl: 30s
+  tracking:
+    avg-speed-kmph: 25

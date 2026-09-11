@@ -134,6 +134,39 @@ abstract class AbstractRideApiTest {
         return mockMvc.perform(post("/api/v1/drivers/%s/rides/%s/end".formatted(driverId, rideId)));
     }
 
+    protected ResultActions pushLocation(String driverId, Location location) throws Exception {
+        return mockMvc.perform(put("/api/v1/drivers/" + driverId + "/location")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"lat\":%s,\"lng\":%s}".formatted(location.lat(), location.lng())));
+    }
+
+    protected ResultActions userHistory(String userId, String status) throws Exception {
+        String query = status == null ? "" : "?status=" + status;
+        return mockMvc.perform(get("/api/v1/users/" + userId + "/rides" + query));
+    }
+
+    protected ResultActions driverHistory(String driverId, String status) throws Exception {
+        String query = status == null ? "" : "?status=" + status;
+        return mockMvc.perform(get("/api/v1/drivers/" + driverId + "/rides" + query));
+    }
+
+    protected ResultActions tracking(String rideId) throws Exception {
+        return mockMvc.perform(get("/api/v1/rides/" + rideId + "/tracking"));
+    }
+
+    protected String bodyOf(ResultActions actions) throws Exception {
+        return actions.andReturn().getResponse().getContentAsString();
+    }
+
+    /**
+     * JsonPath hands back a Double or a BigDecimal depending on how many digits the number has,
+     * so numeric assertions go through this rather than guessing the boxed type.
+     */
+    protected double numberAt(String body, String path) {
+        Number value = JsonPath.read(body, path);
+        return value.doubleValue();
+    }
+
     /** Read straight from the store: there is no read-only status endpoint, and probing via
      *  the availability endpoint would mutate the very state under assertion. */
     protected DriverStatus driverStatusOf(String driverId) {

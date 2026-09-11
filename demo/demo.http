@@ -1,0 +1,222 @@
+### Ride Finder demo
+@baseUrl = http://localhost:8080/api/v1
+@json = application/json
+@pickupLat = 12.9716
+@pickupLng = 77.5946
+@dropLat = 12.9816
+@dropLng = 77.6046
+@farLat = 19.0760
+@farLng = 72.8777
+
+### 1. Happy path: register user and driver, then go online
+POST {{baseUrl}}/users
+Content-Type: {{json}}
+
+{"name":"Demo Rider","phone":"+91-9000000001"}
+
+> {%
+client.global.set("userId", response.body.id);
+%}
+
+###
+POST {{baseUrl}}/drivers
+Content-Type: {{json}}
+
+{"name":"Demo Driver","phone":"+91-9000000001","car":{"plate":"DEMO-HATCH-1","model":"Swift","carType":"HATCHBACK"}}
+
+> {%
+client.global.set("driverId", response.body.id);
+%}
+
+###
+PUT {{baseUrl}}/drivers/{{driverId}}/location
+Content-Type: {{json}}
+
+{"lat":{{pickupLat}},"lng":{{pickupLng}}}
+
+###
+PATCH {{baseUrl}}/drivers/{{driverId}}/availability
+Content-Type: {{json}}
+
+{"online":true}
+
+### Estimate, request, and accept fare
+###
+POST {{baseUrl}}/matching/estimate
+Content-Type: {{json}}
+
+{"pickup":{"lat":{{pickupLat}},"lng":{{pickupLng}}},"drop":{"lat":{{dropLat}},"lng":{{dropLng}}},"carType":"HATCHBACK"}
+
+###
+POST {{baseUrl}}/users/{{userId}}/rides
+Content-Type: {{json}}
+
+{"pickup":{"lat":{{pickupLat}},"lng":{{pickupLng}}},"drop":{"lat":{{dropLat}},"lng":{{dropLng}}},"carType":"HATCHBACK"}
+
+> {%
+client.global.set("rideId", response.body.id);
+%}
+
+###
+POST {{baseUrl}}/users/{{userId}}/rides/{{rideId}}/accept-fare
+
+### Driver accepts the pending offer
+###
+GET {{baseUrl}}/drivers/{{driverId}}/offers
+
+> {%
+client.global.set("offerId", response.body[0].id);
+%}
+
+###
+POST {{baseUrl}}/drivers/{{driverId}}/offers/{{offerId}}/accept
+
+### Tracking, start, end; the response includes quotedFare.total
+###
+GET {{baseUrl}}/rides/{{rideId}}/tracking
+
+###
+POST {{baseUrl}}/drivers/{{driverId}}/rides/{{rideId}}/start
+
+###
+POST {{baseUrl}}/drivers/{{driverId}}/rides/{{rideId}}/end
+
+### Make the first driver unavailable for the upgrade-only scenario
+###
+PATCH {{baseUrl}}/drivers/{{driverId}}/availability
+Content-Type: {{json}}
+
+{"online":false}
+
+### 2a. No driver in radius
+###
+POST {{baseUrl}}/users
+Content-Type: {{json}}
+
+{"name":"No Driver Rider","phone":"+91-9000000002"}
+
+> {%
+client.global.set("farUserId", response.body.id);
+%}
+
+###
+POST {{baseUrl}}/users/{{farUserId}}/rides
+Content-Type: {{json}}
+
+{"pickup":{"lat":{{farLat}},"lng":{{farLng}}},"drop":{"lat":19.0860,"lng":72.8877},"carType":"HATCHBACK"}
+
+> {%
+client.global.set("farRideId", response.body.id);
+%}
+
+###
+POST {{baseUrl}}/users/{{farUserId}}/rides/{{farRideId}}/accept-fare
+
+### 2b. Minimum-fare ride
+###
+POST {{baseUrl}}/users
+Content-Type: {{json}}
+
+{"name":"Minimum Fare Rider","phone":"+91-9000000003"}
+
+> {%
+client.global.set("minimumUserId", response.body.id);
+%}
+
+###
+POST {{baseUrl}}/matching/estimate
+Content-Type: {{json}}
+
+{"pickup":{"lat":{{pickupLat}},"lng":{{pickupLng}}},"drop":{"lat":12.9720,"lng":77.5950},"carType":"HATCHBACK"}
+
+### 2c. Hatchback request upgraded to a nearby sedan
+###
+POST {{baseUrl}}/drivers
+Content-Type: {{json}}
+
+{"name":"Upgrade Driver","phone":"+91-9000000004","car":{"plate":"DEMO-SEDAN-1","model":"Dzire","carType":"SEDAN"}}
+
+> {%
+client.global.set("sedanDriverId", response.body.id);
+%}
+
+###
+PUT {{baseUrl}}/drivers/{{sedanDriverId}}/location
+Content-Type: {{json}}
+
+{"lat":{{pickupLat}},"lng":{{pickupLng}}}
+
+###
+PATCH {{baseUrl}}/drivers/{{sedanDriverId}}/availability
+Content-Type: {{json}}
+
+{"online":true}
+
+###
+POST {{baseUrl}}/users/{{minimumUserId}}/rides
+Content-Type: {{json}}
+
+{"pickup":{"lat":{{pickupLat}},"lng":{{pickupLng}}},"drop":{"lat":{{dropLat}},"lng":{{dropLng}}},"carType":"HATCHBACK"}
+
+> {%
+client.global.set("upgradeRideId", response.body.id);
+%}
+
+###
+POST {{baseUrl}}/users/{{minimumUserId}}/rides/{{upgradeRideId}}/accept-fare
+
+### 2d. Invalid coupon (expected HTTP 400)
+###
+POST {{baseUrl}}/matching/estimate
+Content-Type: {{json}}
+
+{"pickup":{"lat":{{pickupLat}},"lng":{{pickupLng}}},"drop":{"lat":{{dropLat}},"lng":{{dropLng}}},"carType":"HATCHBACK","couponCode":"DOES-NOT-EXIST"}
+
+### 2e. Rain surge, then estimate again
+###
+PUT {{baseUrl}}/admin/conditions
+Content-Type: {{json}}
+
+{"raining":true,"trafficLevel":"LOW"}
+
+###
+POST {{baseUrl}}/matching/estimate
+Content-Type: {{json}}
+
+{"pickup":{"lat":{{pickupLat}},"lng":{{pickupLng}}},"drop":{"lat":{{dropLat}},"lng":{{dropLng}}},"carType":"HATCHBACK"}
+
+### 2f. Cancellation
+### The current API supports cancellation while SEARCHING only; it has no grace-period
+### parameter or cancellation-fee field. This request demonstrates the supported path.
+###
+POST {{baseUrl}}/users
+Content-Type: {{json}}
+
+{"name":"Cancellation Rider","phone":"+91-9000000005"}
+
+> {%
+client.global.set("cancelUserId", response.body.id);
+%}
+
+###
+POST {{baseUrl}}/users/{{cancelUserId}}/rides
+Content-Type: {{json}}
+
+{"pickup":{"lat":{{farLat}},"lng":{{farLng}}},"drop":{"lat":19.0860,"lng":72.8877},"carType":"HATCHBACK"}
+
+> {%
+client.global.set("cancelRideId", response.body.id);
+%}
+
+###
+POST {{baseUrl}}/users/{{cancelUserId}}/rides/{{cancelRideId}}/accept-fare
+
+###
+POST {{baseUrl}}/users/{{cancelUserId}}/rides/{{cancelRideId}}/cancel-search
+
+### 3. History
+###
+GET {{baseUrl}}/users/{{userId}}/rides
+
+###
+GET {{baseUrl}}/drivers/{{driverId}}/rides

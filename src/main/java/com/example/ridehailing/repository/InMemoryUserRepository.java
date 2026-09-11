@@ -11,11 +11,23 @@ import java.util.concurrent.ConcurrentHashMap;
 public class InMemoryUserRepository implements UserRepository {
 
     private final ConcurrentHashMap<String, User> store = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> phoneIndex = new ConcurrentHashMap<>();
 
     @Override
     public User save(User user) {
         store.put(user.id(), user);
         return user;
+    }
+
+    @Override
+    public boolean saveIfPhoneAbsent(User user) {
+        // putIfAbsent is the single atomic step that decides the winner, so concurrent
+        // registrations of the same phone can never both succeed.
+        if (phoneIndex.putIfAbsent(user.phone(), user.id()) != null) {
+            return false;
+        }
+        store.put(user.id(), user);
+        return true;
     }
 
     @Override
